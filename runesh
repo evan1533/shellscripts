@@ -9,6 +9,8 @@ branch=""
 plugopt=""
 gdbopt=""
 hokie_id="evan1533"
+execopt="./esh"
+testopt=""
 
 while [ ! $# -eq 0 ]
 do
@@ -26,6 +28,12 @@ do
 	    ;;
 	--plugins | -p)
 	    plugopt="-p ./plugins"
+	    execopt="${execopt} ${plugopt}"
+	    ;;
+	--test)
+	    shift
+	    testopt="${1}"
+	    execopt="../eshtests/stdriver.py ${testopt}"
 	    ;;
 	--gdb)
 	    gdbopt="gdb"
