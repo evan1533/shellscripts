@@ -7,6 +7,7 @@ gitopt=""
 makeopt=""
 branch=""
 plugopt=""
+gdbopt=""
 hokie_id="evan1533"
 execopt="./esh"
 testopt=""
@@ -34,6 +35,9 @@ do
 	    testopt="${1}"
 	    execopt="../eshtests/stdriver.py ${testopt}"
 	    ;;
+	--gdb)
+	    gdbopt="gdb"
+	    ;;
 	--help | -h)
 	    echo Usage: 'runesh [OPTIONS]'
 	    echo Used to build/run an instance of esh on rlogin
@@ -42,6 +46,7 @@ do
 	    echo -e "  -g,  --git-pull\tPull any updates from the remote git branch before building"
 	    echo -e "  -p,  --plugins\tInclude plugins from './plugins' when building esh"
 	    echo -e "  -r,  --remake\t\tRecompile the shell binary before executing"
+	    echo -e "  --gdb\t\t\tRun esh inside gdb"
 	    echo
 	    exit 0
 	    ;;
@@ -50,6 +55,6 @@ do
     shift
 done
 
-cmd="${cmd} ${branch} ${gitopt} cd src; ${makeopt} ${execopt}"
+cmd="${cmd} ${branch} ${gitopt} cd src; ${makeopt} ${gdbopt} ./esh ${plugopt}"
 echo $cmd
 ssh -t "${hokie_id}@rlogin.cs.vt.edu" $cmd
