@@ -1,0 +1,55 @@
+#!/bin/bash
+
+argc=$#
+eshdir="~/cs3214-esh/"
+cmd="cd ${eshdir};"
+gitopt=""
+makeopt=""
+branch=""
+plugopt=""
+hokie_id="evan1533"
+execopt="./esh"
+testopt=""
+
+while [ ! $# -eq 0 ]
+do
+    case "$1" in
+	--git-pull | -g)
+	    gitopt="git pull;"
+	    ;;
+	--remake | -r)
+	    makeopt="make esh;"
+	    ;;
+	--branch | -b)
+	    shift
+	    #branch="git fetch --all; git checkout ${1};"
+	    branch="git checkout ${1};"
+	    ;;
+	--plugins | -p)
+	    plugopt="-p ./plugins"
+	    execopt="${execopt} ${plugopt}"
+	    ;;
+	--test)
+	    shift
+	    testopt="${1}"
+	    execopt="../eshtests/stdriver.py ${testopt}"
+	    ;;
+	--help | -h)
+	    echo Usage: 'runesh [OPTIONS]'
+	    echo Used to build/run an instance of esh on rlogin
+	    echo 
+	    echo -e "  -b,  --branch <name>\tSpecify the git branch to pull changes from"
+	    echo -e "  -g,  --git-pull\tPull any updates from the remote git branch before building"
+	    echo -e "  -p,  --plugins\tInclude plugins from './plugins' when building esh"
+	    echo -e "  -r,  --remake\t\tRecompile the shell binary before executing"
+	    echo
+	    exit 0
+	    ;;
+
+    esac
+    shift
+done
+
+cmd="${cmd} ${branch} ${gitopt} cd src; ${makeopt} ${execopt}"
+echo $cmd
+ssh -t "${hokie_id}@rlogin.cs.vt.edu" $cmd
