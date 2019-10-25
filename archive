@@ -2,8 +2,10 @@
 
 copy_flag=0
 compress_flag=0
-ARCHIVE_DIR="$HOME/.archive/"
+ARCHIVE_DIR="$HOME/.archive"
 archive_name=""
+delete_files=0
+out="/dev/stdout"
 
 
 function print_usage {
@@ -11,15 +13,28 @@ function print_usage {
     echo "Copy/Move one or more files into archive directory ~/.archive"
     echo ""
     echo "Options:"
-    echo "    -c                        Copy files into archive directory"
-    echo "    -z                        Compress the file into a tar.gz file before archiving"
+    echo "   -c,--copy                  Copy files into archive directory"
+    echo "   -z                         Compress the file into a tar.gz file before archiving"
     echo "   --name <archive_name>      Name of the archive, if not specified then name of first file is used"
+    echo "   --delete                   Delete source files after transferring to archive, cannot be used in conjuction with '-c'"
+    echo "   -q,--quiet                 Don't display any output"
 }
 
 function max_arg_width () {
     local max_width=-1
     for arg in $@
     do
+        [ ${#arg} -gt $max_width ] && max_width=${#arg}
+    done
+
+    echo $max_width
+}
+
+function max_file_name_width () {
+    local max_width=-1
+    for arg in $@
+    do
+        arg=${arg##*/}
         [ ${#arg} -gt $max_width ] && max_width=${#arg}
     done
 
@@ -34,10 +49,20 @@ do
         exit 0
         ;;
     --logs)
-        cat $ARCHIVE_DIR.logs/*.log
+        cat $ARCHIVE_DIR/.logs/*.log
         exit 0
         ;;
-	-c)
+    -q | --quiet)
+        out="/dev/null"
+        shift
+        ;;
+	-c | --copy)
+        if [ $delete_files -eq 1 ]
+        then
+            printf "Err: Conflicting flags '--delete' and '--copy'\n\n"
+            print_usage
+            exit 1
+        fi
 	    copy_flag=1
         shift
 	    ;;
@@ -50,6 +75,16 @@ do
         archive_name="$1"
         shift
         ;;
+    --delete)
+        if [ $copy_flag -eq 1 ]
+        then
+            printf "\e[1;31mErr\e[0m: Conflicting flags '--delete' and '--copy'\n\n"
+            print_usage
+            exit 1
+        fi
+        delete_files=1
+        shift
+        ;;
     *)
         print_usage
         exit 0
@@ -57,16 +92,32 @@ do
     esac
 done
 
+
 if [ $# -lt 1 ]
 then
     print_usage
 else
+    if [ $delete_files -eq 1 ]
+    then
+        printf "Are you sure you want to remove files after transfer? This cannot be undone [y/N]: "
+        read resp
+        if [ ${resp^} = "Y" ] 
+        then
+            delete_files=1
+        else
+            echo "Aborting file transfer"
+            exit 1
+        fi
+    fi
+
     if [ ${#archive_name} -eq 0 ]
     then
         archive_name="${1/\//-}"
         archive_name="${archive_name%%.*}"
     fi
     #echo "$archive_name"   
+    max_width=$(max_arg_width $@)
+    max_file_width=$(max_file_name_width $@)
     while [ $# -gt 0 ]
     do
         file_name="${1##*/}"
@@ -75,37 +126,44 @@ else
         then
             archive_name="$archive_name-$(date +'%F-%H%M').tar.gz"
 
-            echo "tar zcf "$archive_name" "$@""
-            tar zcf "$archive_name" "$@"
+            echo "tar zcf "$archive_name": " > $out
+            tar cf - "$@" | gzip -9 - > "$ARCHIVE_DIR/$archive_name"
             test $? -ne 0 && echo "Err: tar failed" && exit $?
 
-            echo "mv $archive_name $ARCHIVE_DIR"
-            mv $archive_name $ARCHIVE_DIR
-            test $? -ne 0 && echo "Err: mv failed" && exit $?
-           
             dt=$(date +'%b %d %Y %H:%M')
-            printf "+%s  %s\n" "'$archive_name'" "$dt" >> $ARCHIVE_DIR.logs/file_history.log
+            printf "+%s  %s\n" "'$archive_name'" "$dt" >> $ARCHIVE_DIR/.logs/file_history.log
 
             max_width=$(max_arg_width $@)
             PARENT_DIR=$(pwd)
+            file_list="$@"
             while [ $# -gt 0 ]
             do
                 tmp=$1
                 shift
                 tree_char="├"
                 [ $# -eq 0 ] && tree_char="└"
-                printf "\t%s─ %-*s %-*s %s\n" "$tree_char" $((max_width + 4)) "'${tmp##*/}'" $((max_width + ${#PARENT_DIR} + 4)) "$PARENT_DIR/$(ls -dF $tmp)" "$dt" >> $ARCHIVE_DIR.logs/file_history.log
+                printf "   %s─ %-*s\n" "$tree_char" $((max_width + 4)) "'$tmp'" > $out
+                printf "\t%s─ %-*s %-*s %s\n" "$tree_char" $((max_width + 4)) "'$tmp'" $((max_width + ${#PARENT_DIR} + 4)) "$PARENT_DIR/$(ls -dF $tmp)" "$dt" >> $ARCHIVE_DIR/.logs/file_history.log
             done
+            printf "\n" >> $ARCHIVE_DIR/.logs/file_history.log
+            if [ $delete_files -eq 1 ]
+            then
+                echo "rm -r $file_list" > $out
+                rm -r $file_list
+            fi
             exit 0
         elif [ $copy_flag -eq 1 ]
         then
-            rsync -av $file_name $ARCHIVE_DIR 
+            echo "rsync -av $1 $ARCHIVE_DIR/" > $out
+            rsync -av $1 $ARCHIVE_DIR/ > /dev/null
             test $? -ne 0 && echo "Err: rsync failed" && exit $?
         else
-            mv $file_name $ARCHIVE_DIR 
+            echo "mv $1 $ARCHIVE_DIR/" > $out
+            mv $1 $ARCHIVE_DIR/ 
             test $? -ne 0 && echo "Err: mv failed" && exit $?
         fi 
-        printf "+%s  %s  %s\n" "'$file_name'" "$1" "$(date +'%b %d %Y %H:%M')" >> $ARCHIVE_DIR.logs/file_history.log
+        printf "+%-*s  %-*s  %s\n" $((max_file_width + 4)) "'$file_name'" $((max_width + 4)) "$1" "$(date +'%b %d %Y %H:%M')" >> $ARCHIVE_DIR/.logs/file_history.log
         shift
     done
+    printf "\n" >> $ARCHIVE_DIR/.logs/file_history.log
 fi
