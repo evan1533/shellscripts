@@ -3,16 +3,34 @@
 copy_flag=0
 compress_flag=0
 ARCHIVE_DIR="$HOME/.archive/"
+archive_name=""
+
+
+function print_usage {
+    echo "Usage: archive [OPTION] FILE..."
+    echo "Copy/Move one or more files into archive directory ~/.archive"
+    echo ""
+    echo "Options:"
+    echo "    -c                        Copy files into archive directory"
+    echo "    -z                        Compress the file into a tar.gz file before archiving"
+    echo "   --name <archive_name>      Name of the archive, if not specified then name of first file is used"
+}
+
+function max_arg_width () {
+    local max_width=-1
+    for arg in $@
+    do
+        [ ${#arg} -gt $max_width ] && max_width=${#arg}
+    done
+
+    echo $max_width
+}
 
 while [[ $1 == "-"* ]]
 do
     case "$1" in
     --help | -h)
-        echo "Usage: archive [OPTION] FILE..."
-        echo "Copy/Move one or more files into archive directory ~/.archive"
-        echo ""
-        echo "Options:"
-        echo "   -c     Copy files into archive directory"
+        print_usage
         exit 0
         ;;
     --logs)
@@ -27,43 +45,67 @@ do
         compress_flag=1
         shift
         ;;
+    --name)
+        shift
+        archive_name="$1"
+        shift
+        ;;
     *)
-        break
+        print_usage
+        exit 0
         ;;
     esac
 done
 
 if [ $# -lt 1 ]
 then
-    echo "Usage: archive [OPTION] FILE..."
-    echo "Copy/Move one or more files into archive directory ~/.archive"
-    echo ""
-    echo "Options:"
-    echo "   -c     Copy files into archive directory"
-    echo "   -z     Compress the file into a tar.gz file before archiving"
+    print_usage
 else
+    if [ ${#archive_name} -eq 0 ]
+    then
+        archive_name="${1/\//-}"
+        archive_name="${archive_name%%.*}"
+    fi
+    #echo "$archive_name"   
     while [ $# -gt 0 ]
     do
-        file_name="$1"
-        echo $file_name
+        file_name="${1##*/}"
+        #echo $file_name
         if [ $compress_flag -eq 1 ]
         then
-            file_name="${1##*/}"
-            file_name="$file_name-$(date +'%F-%H%M').tar.gz"
-            err_out="$( tar zcf "$file_name" "$1" 2>&1 )"
-            test $? -ne 0 || echo "$err_out" && exit $?
-            err_out="$(mv $file_name $ARCHIVE_DIR 2>&1)"
-            test $? -ne 0 || echo "$err_out" && exit $?
-            
+            archive_name="$archive_name-$(date +'%F-%H%M').tar.gz"
+
+            echo "tar zcf "$archive_name" "$@""
+            tar zcf "$archive_name" "$@"
+            test $? -ne 0 && echo "Err: tar failed" && exit $?
+
+            echo "mv $archive_name $ARCHIVE_DIR"
+            mv $archive_name $ARCHIVE_DIR
+            test $? -ne 0 && echo "Err: mv failed" && exit $?
+           
+            dt=$(date +'%b %d %Y %H:%M')
+            printf "+%s  %s\n" "'$archive_name'" "$dt" >> $ARCHIVE_DIR.logs/file_history.log
+
+            max_width=$(max_arg_width $@)
+            PARENT_DIR=$(pwd)
+            while [ $# -gt 0 ]
+            do
+                tmp=$1
+                shift
+                tree_char="├"
+                [ $# -eq 0 ] && tree_char="└"
+                printf "\t%s─ %-*s %-*s %s\n" "$tree_char" $((max_width + 4)) "'${tmp##*/}'" $((max_width + ${#PARENT_DIR} + 4)) "$PARENT_DIR/$(ls -dF $tmp)" "$dt" >> $ARCHIVE_DIR.logs/file_history.log
+            done
+            exit 0
         elif [ $copy_flag -eq 1 ]
         then
-            err_out="$(rsync -av $file_name $ARCHIVE_DIR 2>&1)"
-            test $? -ne 0 || echo "$err_out" && exit $?
+            rsync -av $file_name $ARCHIVE_DIR 
+            test $? -ne 0 && echo "Err: rsync failed" && exit $?
         else
-            err_out="$(mv $file_name $ARCHIVE_DIR 2>&1)"
-            test $? -ne 0 || echo "$err_out" && exit $?
+            mv $file_name $ARCHIVE_DIR 
+            test $? -ne 0 && echo "Err: mv failed" && exit $?
         fi 
-        echo "+'$file_name' $(date +'%b %d %Y %H:%M')" >> $ARCHIVE_DIR.logs/file_history.log
+        printf "+%s  %s  %s\n" "'$file_name'" "$1" "$(date +'%b %d %Y %H:%M')" >> $ARCHIVE_DIR.logs/file_history.log
         shift
     done
 fi
