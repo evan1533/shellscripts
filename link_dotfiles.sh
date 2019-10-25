@@ -1,5 +1,6 @@
 #!/bin/zsh
 DOTFILE_DIR="$HOME/dotfiles"
+OUT_TO_FILE=0
 setopt nullglob
 
 # Create a symbolic link between two files,
@@ -32,9 +33,14 @@ function link_files () {
 
     if [ -f $link_file ] && [ ! -L $link_file ]
     then
-        echo -e "\e[1;36m${link_file}\e[0m -> ${target_file}"
-        rm $link_file
-        ln -s $target_file $link_file
+        if [ $OUT_TO_FILE -eq 0 ]
+        then
+            echo -e "\e[1;36m${link_file}\e[0m -> ${target_file}"
+            rm $link_file
+            ln -s $target_file $link_file
+        else
+            printf "%-47s\t->\t%s\n" ${link_file} ${target_file} >> ~/dotfiles/file_list.txt
+        fi
     fi
         
 }
@@ -67,5 +73,11 @@ function link_directory () {
         fi
     done
 }
+
+if [ "$1" = "--mock" ]
+then
+    OUT_TO_FILE=1
+    cat /dev/null > ~/dotfiles/file_list.txt
+fi
 
 link_directory $DOTFILE_DIR
