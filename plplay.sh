@@ -1,0 +1,13 @@
+#!/bin/zsh
+
+mpsyt ls, q | sed -n '/Local/,/Enter/p'
+
+echo -n "> "
+read pl_num
+
+pl_session=$(tmux list-sessions 2>/dev/null | grep -o "mpsyt_pl")
+if [[ $pl_session == "mpsyt_pl" ]]
+then
+    tmux kill-session -t mpsyt_pl
+fi
+tmux new -s mpsyt_pl -d "mpsyt open $pl_num, dump, shuffle all"
