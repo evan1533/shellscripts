@@ -1,0 +1,3 @@
+#!/bin/zsh
+
+tmux new -s insane_update -d "mpsyt user insaneintherainmusic, dump, save Insaneintherain-Uploads, q"
