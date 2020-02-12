@@ -1,0 +1,15 @@
+#!/bin/zsh
+
+file_name="$(cmus-remote -Q | sed -e "s/^file //;t;d")"
+album_name="$(cmus-remote -Q | grep "tag album")"
+# echo "$album_name"
+album_name=$(echo "${album_name//tag album /}" | tr '[:upper:]' '[:lower:]' | sed 's/ //g')
+# echo "$album_name"
+
+pl_file="${album_name:+$album_name-favorites}"
+pl_file="${pl_file:-favorites}"
+CMUS_PLAYLIST="/home/evan1533/.config/cmus/playlists/$pl_file"
+BACKUP_PLAYLIST="/home/evan1533/Music/$pl_file"
+
+echo "$file_name" >> $BACKUP_PLAYLIST
+echo "$file_name" >> $CMUS_PLAYLIST

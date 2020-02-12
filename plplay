@@ -1,18 +1,82 @@
 #!/bin/zsh
 
+ID_FILE="./playlist_ids.txt"
+declare -a plist_arr
+
+function play() {
+    local pl_num=$1
+    local no_interrupt=$2
+
+    local pl_session=$(tmux list-sessions 2>/dev/null | grep -o "mpsyt_pl")
+    if [[ $pl_session == "mpsyt_pl" ]]
+    then
+        [[ no_interrupt -eq 0 ]] && tmux kill-session -t mpsyt_pl
+    fi
+    [[ no_interrupt -eq 0 ]] && tmux new -s mpsyt_pl -d "mpsyt open $pl_num, dump, shuffle all"
+}
+
+function update() {
+    local pl_id="$1"
+    local pl_name="$2"
+    #printf "tmux new -s update_mpsyt_pl -d \"mpsyt pl %s, dump, save %s, exit\n" "$pl_id" "$pl_name"
+
+    tmux new -s update_mpsyt_pl -d "mpsyt pl $pl_id, dump, save $pl_name, exit"
+}
+
+function get_index() {
+    value="$1"
+
+    for i in {1.."${#plist_arr[@]}"}
+    do
+        if [[ "${plist_arr[$i]}" == "${value}" ]]
+        then
+            echo "${i}"
+        fi
+    done
+}
+
 if [[ $1 == "stop" ]]
 then
     tmux kill-session -t mpsyt_pl
-else
-    mpsyt ls, q | sed -n '/Local/,/Enter/p'
+elif [[ "$1" == "update" ]]
+then
+    prompt=$(mpsyt ls, q | sed -n '/Local/,/Enter/p')
+    echo "$prompt" | head -n -2
+    printf "\nEnter ID to update a playlist\n"
+
+    plists=$(echo "$prompt" | tail -n +5 | head -n -2 | sed "s/^\s\+//g" | sed "s/\s\+/ /g" | cut -d " " -f 2)
+    plist_arr=("${(f)plists}")
 
     echo -n "> "
     read pl_num
 
-    pl_session=$(tmux list-sessions 2>/dev/null | grep -o "mpsyt_pl")
-    if [[ $pl_session == "mpsyt_pl" ]]
+    declare -a id_list
+    while IFS= read line
+    do
+        cur=("${(@s/ /)line}")
+        ind=$(get_index ${cur[1]})
+        [[ ! -z "$ind" ]] && id_list[ind]="${cur[2]}"
+    done < $ID_FILE
+
+    pl_token="${id_list[$pl_num]}"
+    pl_name="${plist_arr[$pl_num]}"
+
+    if [[ ! -z $pl_token ]]
     then
-       tmux kill-session -t mpsyt_pl
+        #printf "PL: %s %s\n" "$pl_token" "$pl_name"
+        update "$pl_token" "$pl_name"
     fi
-    tmux new -s mpsyt_pl -d "mpsyt open $pl_num, dump, shuffle all"
+
+    play $pl_num 1
+elif [[ ! -z "$1" ]]
+then
+    printf "Unrecognized Option: '%s'\n" "$1"
+else
+    mpsyt ls, q | sed -n '/Local/,/Enter/p' | head -n -2
+    printf "\nEnter <name or ID> to load a playlist\n"
+
+    echo -n "> "
+    read pl_num
+
+    play $pl_num
 fi

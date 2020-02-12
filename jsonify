@@ -1,0 +1,92 @@
+#!/bin/zsh
+
+declare -A id_freq
+declare -A tag_list
+declare -A id_list
+declare num_ids
+
+
+function parse_line()
+{
+    local line="${1:-null}"
+    [[ $line == "null" ]] && return
+    local sep="${2:-,}"
+
+    # printf "\n\t"
+
+    id=$(echo "$line" | cut -d" " -f1)
+    if [[ $id_freq["$id"] -le 1 ]]
+    then
+        # printf "\"%s\": " "$id"
+        # echo -n "\"${line#$id }\"$sep"
+    else
+        # parse_group $id
+    fi
+}
+
+function parse_group()
+{
+    local id="$1"
+
+    echo -n "${id:+$id: }{"
+    printf "}"
+}
+
+function print_json()
+{
+    printf "{"
+    [[ ${#id_list} -gt 0 ]] && printf "\n"
+
+    index=0
+    for cur_id in ${id_list[*]}
+    do
+        (( index += 1 ))
+        i=1
+        tot_freq=${tag_list["$cur_id,0"]}
+        printf "\t\"%s\": " "$cur_id"
+        if [[ $tot_freq -gt 1 ]]
+        then
+            printf "{\n\t"
+            while [[ $i -le $tot_freq ]]
+            do
+                local line="${tag_list["$cur_id,$i"]}"
+                nested_id=$(echo "$line" | cut -d" " -f1)
+                printf "\t\"%s\": \"%s\"" "$nested_id" "${line#$nested_id }"
+                [[ $i -eq $tot_freq ]] && printf "\n\t" || printf ",\n\t"
+                (( i += 1 ))
+            done
+            printf "}"
+        else
+            printf "\"%s\"" "${tag_list["$cur_id,$i"]}"
+        fi
+        [[ $index -lt $num_ids ]] && printf ",\n" || printf "\n"
+    done
+    printf "}\n"
+}
+
+num_ids=0
+unset lastline
+
+while read line
+do
+    # Get the current elems id and increment
+    # its number of occurrences
+    id=$(echo "$line" | cut -d" " -f1)
+    id_freq["$id"]=$(( id_freq["$id"] + 1 ))
+    # If this is the first time this id has occurred
+    if [[ $id_freq["$id"] -eq 1 ]]
+    then
+        # Add it to the list of valid id's
+        id_list[$num_ids]="$id"
+        num_ids=$(( $num_ids + 1 ))
+    fi
+    cur_freq=${id_freq["$id"]}
+    tag_list["$id,0"]=$cur_freq
+    tag_list["$id,$cur_freq"]="${line#$id }"
+
+    # parse_line "$lastline"
+
+    lastline="$line"
+done < "${1:-/dev/stdin}"
+
+print_json
