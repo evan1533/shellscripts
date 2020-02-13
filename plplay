@@ -1,6 +1,6 @@
 #!/bin/zsh
 
-ID_FILE="./playlist_ids.txt"
+ID_FILE="$HOME/.scripts/playlist_ids.txt"
 declare -a plist_arr
 
 function play() {
@@ -21,6 +21,14 @@ function update() {
     #printf "tmux new -s update_mpsyt_pl -d \"mpsyt pl %s, dump, save %s, exit\n" "$pl_id" "$pl_name"
 
     tmux new -s update_mpsyt_pl -d "mpsyt pl $pl_id, dump, save $pl_name, exit"
+}
+
+function volume_up() {
+    tmux send-keys -N 5 -t mpsyt_pl.0 0
+}
+
+function volume_down() {
+    tmux send-keys -N 5 -t mpsyt_pl.0 9
 }
 
 function get_index() {
@@ -68,6 +76,12 @@ then
     fi
 
     play $pl_num 1
+elif [[ "$1" == "volup" ]]
+then
+    volume_up
+elif [[ "$1" == "voldown" ]]
+then
+    volume_down
 elif [[ ! -z "$1" ]]
 then
     printf "Unrecognized Option: '%s'\n" "$1"
