@@ -20,7 +20,9 @@ function update() {
     local pl_name="$2"
     #printf "tmux new -s update_mpsyt_pl -d \"mpsyt pl %s, dump, save %s, exit\n" "$pl_id" "$pl_name"
 
-    tmux new -s update_mpsyt_pl -d "mpsyt pl $pl_id, dump, save $pl_name, exit"
+    # tmux new -s update_mpsyt_pl -d "mpsyt pl $pl_id, dump, save $pl_name, exit"
+    mpsyt pl $pl_id, dump, save $pl_name, exit > /dev/null &
+    wait
 }
 
 function volume_up() {
