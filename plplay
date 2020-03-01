@@ -2,6 +2,7 @@
 
 ID_FILE="$HOME/.scripts/playlist_ids.txt"
 declare -a plist_arr
+SHUFFLE="shuffle"
 
 function play() {
     local pl_num=$1
@@ -12,7 +13,7 @@ function play() {
     then
         [[ no_interrupt -eq 0 ]] && tmux kill-session -t mpsyt_pl
     fi
-    [[ no_interrupt -eq 0 ]] && tmux new -s mpsyt_pl -d "mpsyt open $pl_num, dump, shuffle all"
+    [[ no_interrupt -eq 0 ]] && tmux new -s mpsyt_pl -d "mpsyt open $pl_num, dump, $SHUFFLE all"
 }
 
 function update() {
@@ -44,6 +45,12 @@ function get_index() {
         fi
     done
 }
+
+if [[ "$1" == "noshuffle" ]]
+then
+    SHUFFLE=""
+    shift
+fi
 
 if [[ $1 == "stop" ]]
 then

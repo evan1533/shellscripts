@@ -1,5 +1,5 @@
 #!/bin/bash
 dm-tool lock &
-sleep 2
-sudo systemctl suspend
-date
+# sleep 2
+# sudo systemctl suspend
+# date
