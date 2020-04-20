@@ -52,7 +52,18 @@ then
     shift
 fi
 
-if [[ $1 == "stop" ]]
+if [[ "$1" == "attach" ]]
+then
+    local pl_num=$1
+    local no_interrupt=$2
+
+    local pl_session=$(tmux list-sessions 2>/dev/null | grep -o "mpsyt_pl")
+    if [[ $pl_session == "mpsyt_pl" ]]
+    then
+        [[ no_interrupt -eq 0 ]] && tmux kill-session -t mpsyt_pl
+    fi
+    [[ no_interrupt -eq 0 ]] && tmux new -s mpsyt_pl "mpsyt"
+elif [[ $1 == "stop" ]]
 then
     tmux kill-session -t mpsyt_pl
 elif [[ "$1" == "update" ]]
