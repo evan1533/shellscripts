@@ -6,6 +6,7 @@ ARCHIVE_DIR="$HOME/.archive"
 archive_name=""
 delete_files=0
 out="/dev/stdout"
+DEBUG=0
 
 
 function print_usage {
@@ -26,7 +27,10 @@ function max_arg_width () {
         [ ${#arg} -gt $max_width ] && max_width=${#arg}
     done
 
-    echo $max_width
+    if [[ $DEBUG -eq 1 ]]
+    then
+        echo "Max arg width: $max_width"
+    fi
 }
 
 function max_file_name_width () {
@@ -37,7 +41,10 @@ function max_file_name_width () {
         [ ${#arg} -gt $max_width ] && max_width=${#arg}
     done
 
-    echo $max_width
+    if [[ $DEBUG -eq 1 ]]
+    then
+        echo "Max file name width: $max_width"
+    fi
 }
 
 while [[ $1 == "-"* ]]
@@ -53,6 +60,10 @@ do
         ;;
     -q | --quiet)
         out="/dev/null"
+        if [[ $DEBUG -eq 1 ]]
+        then
+            echo "output redirected to /dev/null"
+        fi
         shift
         ;;
 	-c | --copy)
@@ -63,11 +74,19 @@ do
             exit 1
         fi
 	    copy_flag=1
+        if [[ $DEBUG -eq 1 ]]
+        then
+            echo "Copy flag set"
+        fi
         shift
 	    ;;
     --name)
         shift
         archive_name="$1"
+        if [[ $DEBUG -eq 1 ]]
+        then
+            echo "Archive name set to $archive_name"
+        fi
         shift
         ;;
     --delete)
@@ -78,6 +97,14 @@ do
             exit 1
         fi
         delete_files=1
+        if [[ $DEBUG -eq 1 ]]
+        then
+            echo "Delete flag set"
+        fi
+        shift
+        ;;
+    --debug)
+        DEBUG=1
         shift
         ;;
     *)
@@ -99,6 +126,10 @@ else
         if [ ${resp^} = "Y" ]
         then
             delete_files=1
+            if [[ $DEBUG -eq 1 ]]
+            then
+                echo "Files set to be deleted"
+            fi
         else
             echo "Aborting file transfer"
             exit 1
@@ -109,24 +140,43 @@ else
     then
         archive_name="${1/\//-}"
         archive_name="${archive_name%%.*}"
+        if [[ $DEBUG -eq 1 ]]
+        then
+            echo "$archive_name"
+        fi
     fi
-    #echo "$archive_name"
     max_width=$(max_arg_width $@)
     max_file_width=$(max_file_name_width $@)
     while [ $# -gt 0 ]
     do
         file_name="${1##*/}"
-        #echo $file_name
+        if [[ $DEBUG -eq 1 ]]
+        then
+            echo "Processing $file_name..."
+        fi
+
         if [ $compress_flag -eq 1 ]
         then
             archive_name="$archive_name-$(date +'%F-%H%M').tar.gz"
 
-            echo "tar zcf "$archive_name": " > $out
-            tar cf - "$@" | gzip -9 - > "$ARCHIVE_DIR/$archive_name"
-            test $? -ne 0 && echo "Err: tar failed" && exit $?
+            echo "tar zcf \"$archive_name\": " > $out
+            if [[ $DEBUG -eq 1 ]]
+            then
+                echo 'tar cf - "$@" | gzip -9 - > "$ARCHIVE_DIR/$archive_name'
+                printf "tar cf - \"%s\" | gzip -9 - > \"%s/%s\"\n" "$@" "$ARCHIVE_DIR" "$archive_name"
+            else
+                tar cf - "$@" | gzip -9 - > "$ARCHIVE_DIR/$archive_name"
+                test $? -ne 0 && echo "Err: tar failed" && exit $?
+            fi
 
             dt=$(date +'%b %d %Y %H:%M')
-            printf "+%s  %s\n" "'$archive_name'" "$dt" >> $ARCHIVE_DIR/.logs/file_history.log
+            if [[ $DEBUG -eq 1 ]]
+            then
+                echo "Output to log: >> $ARCHIVE_DIR/.logs/file_history.log"
+                printf "+%s  %s\n" "'$archive_name'" "$dt"
+            else
+                printf "+%s  %s\n" "'$archive_name'" "$dt" >> $ARCHIVE_DIR/.logs/file_history.log
+            fi
 
             max_width=$(max_arg_width $@)
             PARENT_DIR=$(pwd)
@@ -138,13 +188,30 @@ else
                 tree_char="├"
                 [ $# -eq 0 ] && tree_char="└"
                 printf "   %s─ %-*s\n" "$tree_char" $((max_width + 4)) "'$tmp'" > $out
-                printf "\t%s─ %-*s %-*s %s\n" "$tree_char" $((max_width + 4)) "'$tmp'" $((max_width + ${#PARENT_DIR} + 4)) "$PARENT_DIR/$(ls -dF $tmp)" "$dt" >> $ARCHIVE_DIR/.logs/file_history.log
+
+                if [[ $DEBUG -eq 1 ]]
+                then
+                    echo "Output to log: >> $ARCHIVE_DIR/.logs/file_history.log"
+                    printf "\t%s─ %-*s %-*s %s\n" "$tree_char" $((max_width + 4)) "'$tmp'" $((max_width + ${#PARENT_DIR} + 4)) "$PARENT_DIR/$(ls -dF $tmp)" "$dt"
+                else
+                    printf "\t%s─ %-*s %-*s %s\n" "$tree_char" $((max_width + 4)) "'$tmp'" $((max_width + ${#PARENT_DIR} + 4)) "$PARENT_DIR/$(ls -dF $tmp)" "$dt" >> $ARCHIVE_DIR/.logs/file_history.log
+                fi
             done
-            printf "\n" >> $ARCHIVE_DIR/.logs/file_history.log
+            if [[ $DEBUG -eq 1 ]]
+            then
+                printf "\n"
+            else
+                printf "\n" >> $ARCHIVE_DIR/.logs/file_history.log
+            fi
             if [ $delete_files -eq 1 ]
             then
-                echo "rm -r $file_list" > $out
-                rm -r $file_list
+                if [[ $DEBUG -eq 1 ]]
+                then
+                    echo "rm -r $file_list" > $out
+                else
+                    echo "rm -r $file_list" > $out
+                    rm -r $file_list
+                fi
             fi
             exit 0
         # elif [ $copy_flag -eq 1 ]
@@ -157,8 +224,19 @@ else
         #     mv $1 $ARCHIVE_DIR/
         #     test $? -ne 0 && echo "Err: mv failed" && exit $?
         fi
-        printf "+%-*s  %-*s  %s\n" $((max_file_width + 4)) "'$file_name'" $((max_width + 4)) "$1" "$(date +'%b %d %Y %H:%M')" >> $ARCHIVE_DIR/.logs/file_history.log
+        if [[ $DEBUG -eq 1 ]]
+        then
+            echo "Output to log: >> $ARCHIVE_DIR/.logs/file_history.log"
+            printf "+%-*s  %-*s  %s\n" $((max_file_width + 4)) "'$file_name'" $((max_width + 4)) "$1" "$(date +'%b %d %Y %H:%M')"
+        else
+            printf "+%-*s  %-*s  %s\n" $((max_file_width + 4)) "'$file_name'" $((max_width + 4)) "$1" "$(date +'%b %d %Y %H:%M')" >> $ARCHIVE_DIR/.logs/file_history.log
+        fi
         shift
     done
-    printf "\n" >> $ARCHIVE_DIR/.logs/file_history.log
+    if [[ $DEBUG -eq 1 ]]
+    then
+        printf "\n"
+    else
+        printf "\n" >> $ARCHIVE_DIR/.logs/file_history.log
+    fi
 fi
