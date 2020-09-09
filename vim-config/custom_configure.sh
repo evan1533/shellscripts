@@ -1,0 +1,11 @@
+./configure --with-features=huge \
+            --enable-multibyte \
+	    --enable-rubyinterp=yes \
+	    --enable-pythoninterp=yes \
+	    --enable-python3interp=yes \
+	    --with-python3-config-dir=/usr/lib/python3.8/config-3.7m-x86_64-linux-gnu \
+	    --enable-perlinterp=yes \
+	    --enable-luainterp=yes \
+            --enable-gui=auto \
+            --enable-cscope \
+	   --prefix=/usr/local
