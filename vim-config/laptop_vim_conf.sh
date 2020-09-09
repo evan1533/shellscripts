@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # sudo apt remove vim vim-runtime gvim
 
@@ -24,4 +24,5 @@
  && make VIMRUNTIMEDIR=/usr/share/vim/vim82
 
 
-sudo checkinstall --pkgname 'vim' --pkgversion '8.2.1567' --pkgrelease '2' --pkgsource 'https://github.com/vim/vim' --provides 'vim'
+VERSION=`git describe --tags --abbrev=0 HEAD`
+sudo checkinstall --pkgname 'vim' --pkgversion '${VERSION#v}' --pkgrelease '8' --pkgsource 'https://github.com/vim/vim' --provides 'vim'

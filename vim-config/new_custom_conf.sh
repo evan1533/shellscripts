@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # sudo apt remove vim vim-runtime gvim
 
@@ -17,6 +17,8 @@
             --enable-rubyinterp=yes \
             --with-python3-config-dir=$(python3-config --configdir) \
             --prefix=/usr/local \
- && make VIMRUNTIMEDIR=/usr/local/share/vim/vim82 -j8
+ && make distclean && make VIMRUNTIMEDIR=/usr/local/share/vim/vim82 -j8
 
-sudo checkinstall --pkgname 'vim' --pkgversion '8.2.1567' --pkgrelease '2' --pkgsource 'https://github.com/vim/vim' --provides 'vim'
+
+VERSION=`git describe --tags --abbrev=0 HEAD`
+sudo checkinstall --pkgname 'vim' --pkgversion '${VERSION#v}' --pkgrelease '8' --pkgsource 'https://github.com/vim/vim' --provides 'vim'
