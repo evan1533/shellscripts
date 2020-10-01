@@ -4,26 +4,57 @@ ID_FILE="$HOME/.scripts/playlist_ids.txt"
 declare -a plist_arr
 SHUFFLE="shuffle"
 
+function print_usage {
+    echo "Usage: plplay [OPTION | command]"
+    echo "Select one of your mps-youtube playlists to start playing in the background using tmux"
+    echo ""
+    echo "Options:"
+    echo "   -no-shuffle        Play the selected playlist in its original order"
+    echo "   --attach           Attach to the created tmux session once playback starts"
+    echo "   --help             Display help information about using the 'plplay' script"
+    echo ""
+    echo "Commands:"
+    echo "   stop               Stop playback, killing the tmux session"
+    echo "   update             Select a playlist to update, then play the updated playlist"
+    echo "                          NOTE: The selected playlist must be an actual youtube playlist with"
+    echo "                                its playlist id stored in ./playlist_ids.txt following the format:"
+    echo ""
+    echo "                                      '<mpsyt-playlist-name> <youtube-playlist-ID>'"
+    echo ""
+    echo "   volup              Increase the volume by 10"
+    echo "   voldown            Decrease the volume by 10"
+}
+
 function play() {
     local pl_num=$1
-    local no_interrupt=$2
+    local no_interrupt=${2:-0}
 
     local pl_session=$(tmux list-sessions 2>/dev/null | grep -o "mpsyt_pl")
-    if [[ $pl_session == "mpsyt_pl" ]]
+    # Check if a current mpsyt_pl tmux session is already running
+    if [[ $pl_session ]]
     then
-        [[ no_interrupt -eq 0 ]] && tmux kill-session -t mpsyt_pl
+        # If $no_interrup is not set, kill the current mpsyt_pl session
+        # And unset the $pl_session variable
+        [[ $no_interrupt -eq 0 ]] && tmux kill-session -t mpsyt_pl && unset pl_session
     fi
-    [[ no_interrupt -eq 0 ]] && tmux new -s mpsyt_pl -d "mpsyt open $pl_num, dump, $SHUFFLE all"
+    # Start a new mpsyt_pl tmux session
+    [[ -z $pl_session ]] && tmux new -s mpsyt_pl -d "mpsyt open $pl_num, dump, $SHUFFLE all"
 }
 
 function update() {
     local pl_id="$1"
     local pl_name="$2"
-    #printf "tmux new -s update_mpsyt_pl -d \"mpsyt pl %s, dump, save %s, exit\n" "$pl_id" "$pl_name"
 
-    # tmux new -s update_mpsyt_pl -d "mpsyt pl $pl_id, dump, save $pl_name, exit"
-    mpsyt pl $pl_id, dump, save $pl_name, exit > /dev/null &
-    wait
+    if [[ $1 ]] && [[ $2 ]]
+    then
+        # printf "tmux new -s update_mpsyt_pl -d \"mpsyt pl %s, dump, save %s, exit\n" "$pl_id" "$pl_name"
+
+        tmux new -s update_mpsyt_pl -d "mpsyt pl $pl_id, dump, save $pl_name, exit"
+        mpsyt pl $pl_id, dump, save $pl_name, exit > /dev/null &
+        wait
+    else
+        echo "ERR: update() given empty string"
+    fi
 }
 
 function volume_up() {
@@ -34,83 +65,149 @@ function volume_down() {
     tmux send-keys -N 5 -t mpsyt_pl.0 9
 }
 
+# get_index:
+#
+# Return the displayed index value of a specific mpsyt playlist
+#
+# Get the index value corresponding to the position of playlist name "$1" in the global
+# playlist array: '$plist_arr'
+#
+# NOTE: the display order and thus indexing of the playlists is based on output
+# generated from mpsyt, thus the index of a given playlist is subject to change
+# across different calls to 'update'.
+# It is for this reason that we MUST:
+#    - rebuild the playlist array each time
+#    - Store the playlist information according to its name
+#    - Store the playlists data in $ID_FILE using the format:
+#         <mpsyt playlist name> <YouTube playlist id>
+#
+# Parameters
+# ----------
+# $1 : string
+#       The name of the mpsyt playlist whose index we want to retrieve
+#
+# Returns
+# -------
+# $i : integer
+#       This should correspond to the index of the playlist as it was displayed
+#       on the menu when prompting the user for input.
 function get_index() {
     value="$1"
 
+    # Get playlist name from displayed index
     for i in {1.."${#plist_arr[@]}"}
     do
-        if [[ "${plist_arr[$i]}" == "${value}" ]]
+        # echo "$i ${plist_arr[$i]} ${value}" 1>&2
+        if [[ "${plist_arr[$i]}" = "${value}" ]]
         then
             echo "${i}"
         fi
     done
 }
 
-if [[ "$1" == "noshuffle" ]]
-then
-    SHUFFLE=""
-    shift
-fi
-
-if [[ "$1" == "attach" ]]
-then
-    local pl_num=$1
-    local no_interrupt=$2
-
-    local pl_session=$(tmux list-sessions 2>/dev/null | grep -o "mpsyt_pl")
-    if [[ $pl_session == "mpsyt_pl" ]]
+function main() {
+    if [[ "$1" == "-h" ]] || [[ "$1" = "--help" ]]
     then
-        [[ no_interrupt -eq 0 ]] && tmux kill-session -t mpsyt_pl
-    fi
-    [[ no_interrupt -eq 0 ]] && tmux new -s mpsyt_pl "mpsyt"
-elif [[ $1 == "stop" ]]
-then
-    tmux kill-session -t mpsyt_pl
-elif [[ "$1" == "update" ]]
-then
-    prompt=$(mpsyt ls, q | sed -n '/Local/,/Enter/p')
-    echo "$prompt" | head -n -2
-    printf "\nEnter ID to update a playlist\n"
-
-    plists=$(echo "$prompt" | tail -n +5 | head -n -2 | sed "s/^\s\+//g" | sed "s/\s\+/ /g" | cut -d " " -f 2)
-    plist_arr=("${(f)plists}")
-
-    echo -n "> "
-    read pl_num
-
-    declare -a id_list
-    while IFS= read line
-    do
-        cur=("${(@s/ /)line}")
-        ind=$(get_index ${cur[1]})
-        [[ ! -z "$ind" ]] && id_list[ind]="${cur[2]}"
-    done < $ID_FILE
-
-    pl_token="${id_list[$pl_num]}"
-    pl_name="${plist_arr[$pl_num]}"
-
-    if [[ ! -z $pl_token ]]
-    then
-        #printf "PL: %s %s\n" "$pl_token" "$pl_name"
-        update "$pl_token" "$pl_name"
+        print_usage
+        exit
     fi
 
-    play $pl_num 1
-elif [[ "$1" == "volup" ]]
-then
-    volume_up
-elif [[ "$1" == "voldown" ]]
-then
-    volume_down
-elif [[ ! -z "$1" ]]
-then
-    printf "Unrecognized Option: '%s'\n" "$1"
-else
-    mpsyt ls, q | sed -n '/Local/,/Enter/p' | head -n -2
-    printf "\nEnter <name or ID> to load a playlist\n"
+    if [[ "$1" = "--no-shuffle" ]]
+    then
+        SHUFFLE=""
+        shift
+    fi
 
-    echo -n "> "
-    read pl_num
+    if [[ "$1" = "--attach" ]]
+    then
+        pl_num=$1
+        no_interrupt=$2
 
-    play $pl_num
-fi
+        jl_session=$(tmux list-sessions 2>/dev/null | grep -o "mpsyt_pl")
+        if [[ $pl_session = "mpsyt_pl" ]]
+        then
+            [[ no_interrupt -eq 0 ]] && tmux kill-session -t mpsyt_pl
+        fi
+        [[ no_interrupt -eq 0 ]] && tmux new -s mpsyt_pl "mpsyt"
+    elif [[ $1 = "stop" ]]
+    then
+        tmux kill-session -t mpsyt_pl
+    elif [[ "$1" = "update" ]]
+    then
+        prompt=$(mpsyt ls, q | sed -n '/Local/,/Enter/p')
+        echo "$prompt" | head -n -2
+        printf "\nEnter ID to update a playlist\n"
+
+        # Preserve old IFS
+        # ORIG_IFS=$IFS
+        # plists=$(echo "$prompt" | tail -n +5 | head -n -2 | sed "s/^\s\+//g" | sed "s/\s\+/ /g" | cut -d " " -f 2)
+        # local IFS=$'\n' plist_arr=( $(echo "$prompt" | tail -n +5 | head -n -2 | sed "s/^\s\+//g" | sed "s/\s\+/ /g" | cut -d " " -f 2) )
+        # IFS=$ORIG_IFS
+        # zsh specific way of converting output to array
+        plists=$(echo "$prompt" | tail -n +5 | head -n -2 | sed "s/^\s\+//g" | sed "s/\s\+/ /g" | cut -d " " -f 2)
+        plist_arr=("${(f)plists}")
+
+
+        echo -n "> "
+        read pl_num
+        # if [[ -n $BASH_VERSION ]]
+        # then
+        #     pl_num=$(($pl_num-1))
+        # fi
+
+        # Load the playlist id's into array from external '$ID_FILE'
+        # For reference the lines in '$ID_FILE' are formatted as follows:
+        # <mpsyt playlist name> <YouTube playlist id>
+        declare -a id_list
+        while IFS= read line
+        do
+            # Split the line into array:
+            #   [<mpsyt playlist name>, <YouTube playlist id>]
+            cur=("${(@s/ /)line}")
+
+            # Calls get_index(<mpsyt playlist name>)
+            ind=$(get_index ${cur[1]})
+
+            # Make sure index is not NULL
+            # If returned index value is not NULL:
+            # store the playlists YouTube ID at index '$ind' in '$id_list'
+            # NOTE: ID's are stored in id list based on the position of the
+            #       playlist in the global array '$plist_arr' NOT its position
+            #       in '$id_list'.
+            [[ $ind ]] && id_list[$ind]="${cur[2]}" || echo "No id for ${cur[1]}"
+        done < $ID_FILE
+
+        pl_token="${id_list[$pl_num]}"
+        pl_name="${plist_arr[$pl_num]}"
+
+        # If the playlist has a corresponding YouTube ID in '$ID_FILE'
+        if [[ ! -z $pl_token ]]
+        then
+            update "$pl_token" "$pl_name"
+        fi
+
+        # Play the updated playlist
+        play $pl_num 1
+    elif [[ "$1" = "volup" ]]
+    then
+        volume_up
+    elif [[ "$1" = "voldown" ]]
+    then
+        volume_down
+    elif [[ ! -z "$1" ]]
+    then
+        printf "Unrecognized Option: '%s'\n" "$1"
+        print_usage
+        exit 1
+    else
+        mpsyt ls, q | sed -n '/Local/,/Enter/p' | head -n -2
+        printf "\nEnter <name or ID> to load a playlist\n"
+
+        echo -n "> "
+        read pl_num
+
+        play $pl_num
+    fi
+}
+
+main $@
