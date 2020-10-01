@@ -3,27 +3,27 @@
 
 static char* toBinary(int num, int size)
 {
-	char* res = calloc(size + 1, sizeof(char));
-	int temp = num;
+    char* res = calloc(size + 1, sizeof(char));
+    int temp = num;
 
-	if(num < 0)
-	{
-		temp = (num*-1)-1;
-	}
+    if(num < 0)
+    {
+        temp = (num*-1)-1;
+    }
 
-	for(int j = 0; j < size; j++)
-	{
-		*(res+j) = (num < 0) ? '1' : '0';
-	}
+    for(int j = 0; j < size; j++)
+    {
+        *(res+j) = (num < 0) ? '1' : '0';
+    }
 
-	int i = 0;
-	while(temp > 0)
-	{
-		*(res+(size-1-i)) = (num < 0) ? '1'-temp%2 : '0'+temp%2;
-		temp = temp >> 1;
-		i++;
-	}
-	return res;
+    int i = 0;
+    while(temp > 0)
+    {
+        *(res+(size-1-i)) = (num < 0) ? '1'-temp%2 : '0'+temp%2;
+        temp = temp >> 1;
+        i++;
+    }
+    return res;
 }
 
 int main(int argc, char** argv)
