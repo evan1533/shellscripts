@@ -66,20 +66,20 @@ do
         fi
         shift
         ;;
-	-c | --copy)
+    -c | --copy)
         if [ $delete_files -eq 1 ]
         then
             printf "Err: Conflicting flags '--delete' and '--copy'\n\n"
             print_usage
             exit 1
         fi
-	    copy_flag=1
+        copy_flag=1
         if [[ $DEBUG -eq 1 ]]
         then
             echo "Copy flag set"
         fi
         shift
-	    ;;
+        ;;
     --name)
         shift
         archive_name="$1"
