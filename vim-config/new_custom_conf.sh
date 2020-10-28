@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# sudo apt remove vim vim-runtime gvim
+# [[ $(dpkg -l | grep vim | wc -l) -gt 0 ]] && sudo apt remove vim vim-runtime gvim
 
-VIMSRCDIR=/home/evan1533/.local/src/vim
+VIMSRCDIR=~/.local/src/vim
 PYTHON3CMD=$(python3 --version | tr "[:upper:]" "[:lower:]" | tr -d "[:blank:]" | grep -Po "^python3\.\d")
 
 sudo apt build-dep -y vim-gtk
