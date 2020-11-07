@@ -6,10 +6,10 @@ VIMSRCDIR=~/.local/src/vim
 PYTHON3CMD=$(python3 --version | tr "[:upper:]" "[:lower:]" | tr -d "[:blank:]" | grep -Po "^python3\.\d")
 
 sudo apt build-dep -y vim-gtk
-sudo apt install -y python3
+sudo apt install -y python3 libpython3-dev
 
 # Lua stuff
-# sudo apt install liblua5.2-dev
+sudo apt install liblua5.2-dev
 # [[ ! -d /usr/include/lua5.2/include ]] && mkdir /usr/include/lua5.2/include || cp -r /usr/include/lua5.2/*.* /usr/include/lua5.2/include/ || exit 1
 # [[ ! -L /usr/local/lib/liblua.so ]] || mv /usr/local/lib/liblua.so /usr/local/lib/liblua.so.old && sudo ln -s /usr/lib/x86_64-linux-gnu/liblua5.2.so /usr/local/lib/liblua.so || exit 1
 
@@ -30,13 +30,12 @@ make clean distclean
             --enable-python3interp=yes \
             --with-python3-config-dir=$(${PYTHON3CMD}-config --configdir) \
             --enable-luainterp=yes \
-            --with-lua-prefix=/usr/include/lua5.2 \
+            # --with-lua-prefix=/usr/include/lua5.2 \
             --enable-perlinterp=yes \
             --enable-rubyinterp=yes \
             --enable-fail-if-missing \
             --enable-largefile \
             --prefix=/usr/local \
- && make distclean \
  && make VIMRUNTIMEDIR=/usr/local/share/vim/vim82 -j$(nproc) \
  && make install
 
